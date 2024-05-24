@@ -22,10 +22,13 @@
 #define SYSTEM_PWR_STATE(state) ((state)->pwr_domain_state[PLAT_MAX_PWR_LVL])
 
 uintptr_t k3_sec_entrypoint;
+unsigned int STANDBY_CORES_CNT[4];
 
 static void k3_cpu_standby(plat_local_state_t cpu_state)
 {
 	u_register_t scr;
+	/* int core; */
+	/* core = plat_my_core_pos(); */
 
 	scr = read_scr_el3();
 	/* Enable the Non secure interrupt to wake the CPU */
@@ -33,8 +36,15 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 	isb();
 	/* dsb is good practice before using wfi to enter low power states */
 	dsb();
+
+	/* up the idle count  for that core */
+	/* STANDBY_CORES_CNT[core] = 1U; */
+
 	/* Enter standby state */
 	wfi();
+
+	/* drop the count as soon as we exit wfi for the core */
+	/* STANDBY_CORES_CNT[core] = 0U; */
 	/* Restore SCR */
 	write_scr_el3(scr);
 }
@@ -195,12 +205,14 @@ void k3_pwr_domain_off(const psci_power_state_t *target_state)
 	}
 }
 
+volatile unsigned int FINISH_FLAG = 1;
 void k3_pwr_domain_on_finish(const psci_power_state_t *target_state)
 {
 	/* TODO: Indicate to System firmware about completion */
 
-	k3_gic_pcpu_init();
-	k3_gic_cpuif_enable();
+		k3_gic_pcpu_init();
+		k3_gic_cpuif_enable();
+	/* } */
 }
 
 static void __dead2 k3_system_off(void)
@@ -226,10 +238,35 @@ static void __dead2 k3_system_reset(void)
 		wfi();
 }
 
+volatile int holdit = 0x1;
 static int k3_validate_power_state(unsigned int power_state,
 				   psci_power_state_t *req_state)
 {
-	/* TODO: perform the proper validation */
+       unsigned int i;
+       unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
+       unsigned int pstate = psci_get_pstate_type(power_state);
+	unsigned int core;
+	core = plat_my_core_pos();
+
+
+       if (pstate == PSTATE_TYPE_STANDBY) {
+               if (pwr_lvl != MPIDR_AFFLVL0)
+                       return PSCI_E_INVALID_PARAMS;
+
+	       /* printf("dbg: %s : type standby core = %d", __func__, core); */
+               /* req_state->pwr_domain_state[MPIDR_AFFLVL0] = PLAT_MAX_RET_STATE; */
+		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
+		STANDBY_CORES_CNT[core] = 1U;
+		if (STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1])
+			CLUSTER_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
+       } else {
+               for (i = MPIDR_AFFLVL0; i <= pwr_lvl; i++)
+                       req_state->pwr_domain_state[i] = PLAT_MAX_OFF_STATE;
+       }
+
+       if (psci_get_pstate_id(power_state))
+               return PSCI_E_INVALID_PARAMS;
+
 
 	return PSCI_E_SUCCESS;
 }
@@ -241,19 +278,49 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 	core = plat_my_core_pos();
 	proc_id = PLAT_PROC_START_ID + core;
 
-	/* Prevent interrupts from spuriously waking up this cpu */
-	k3_gic_cpuif_disable();
-	k3_gic_save_context();
+		/* INFO("\n1. dbg: %s", __func__); */
+	if (is_local_state_off(CORE_PWR_STATE(target_state))) {
+		INFO("\n2. dbg: %s", __func__);
+			FINISH_FLAG = 1;
+		while (holdit ==1);
+		/* Prevent interrupts from spuriously waking up this cpu */
+		k3_gic_cpuif_disable();
+		k3_gic_save_context();
 
-	k3_pwr_domain_off(target_state);
+		k3_pwr_domain_off(target_state);
 
-	ti_sci_enter_sleep(proc_id, 0, k3_sec_entrypoint);
+		ti_sci_enter_sleep(proc_id, 0, k3_sec_entrypoint);
+	}
+	else {
+		/* INFO("This is where standby implementation should be?"); */
+		/* Mode = 2 */
+		/* INFO("\n3. dbg: %s: enter stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
+			/* Prevent interrupts from spuriously waking up this cpu */
+			/* k3_gic_cpuif_disable(); */
+			/* k3_gic_save_context(); */
+
+			isb();
+			/* dsb is good practice before using wfi to enter low power states */
+			dsb();
+
+			/* Enter standby state */
+			wfi();
+
+			/* drop the count as soon as we exit wfi for the core */
+			STANDBY_CORES_CNT[0] = 0U;
+			STANDBY_CORES_CNT[1] = 0U;
+			FINISH_FLAG = 0;
+			/* INFO("\n3. dbg: %s: exit stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
+	}
 }
 
 static void k3_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 {
+	if (FINISH_FLAG == 1) {
+	while(FINISH_FLAG);
 	k3_gic_restore_context();
 	k3_gic_cpuif_enable();
+	}
 }
 
 static void k3_get_sys_suspend_power_state(psci_power_state_t *req_state)
