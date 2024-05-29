@@ -27,8 +27,6 @@ unsigned int STANDBY_CORES_CNT[4];
 static void k3_cpu_standby(plat_local_state_t cpu_state)
 {
 	u_register_t scr;
-	/* int core; */
-	/* core = plat_my_core_pos(); */
 
 	scr = read_scr_el3();
 	/* Enable the Non secure interrupt to wake the CPU */
@@ -37,16 +35,12 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 	/* dsb is good practice before using wfi to enter low power states */
 	dsb();
 
-	/* up the idle count  for that core */
-	/* STANDBY_CORES_CNT[core] = 1U; */
-
 	/* Enter standby state */
 	wfi();
 
-	/* drop the count as soon as we exit wfi for the core */
-	/* STANDBY_CORES_CNT[core] = 0U; */
 	/* Restore SCR */
 	write_scr_el3(scr);
+
 }
 
 static int k3_pwr_domain_on(u_register_t mpidr)
@@ -209,7 +203,6 @@ volatile unsigned int FINISH_FLAG = 1;
 void k3_pwr_domain_on_finish(const psci_power_state_t *target_state)
 {
 	/* TODO: Indicate to System firmware about completion */
-
 		k3_gic_pcpu_init();
 		k3_gic_cpuif_enable();
 	/* } */
@@ -291,27 +284,34 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 		ti_sci_enter_sleep(proc_id, 0, k3_sec_entrypoint);
 	}
-	else {
-		/* INFO("This is where standby implementation should be?"); */
+	else if ( CORE_PWR_STATE(target_state) == PLAT_MAX_RET_STATE ) {
+		INFO("\n\nThis is where standby implementation should be");
 		/* Mode = 2 */
-		/* INFO("\n3. dbg: %s: enter stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
-			/* Prevent interrupts from spuriously waking up this cpu */
-			/* k3_gic_cpuif_disable(); */
-			/* k3_gic_save_context(); */
 
-			isb();
-			/* dsb is good practice before using wfi to enter low power states */
-			dsb();
+		u_register_t scr;
 
-			/* Enter standby state */
-			wfi();
+		scr = read_scr_el3();
+		/* Enable the Non secure interrupt to wake the CPU */
+		write_scr_el3(scr | SCR_IRQ_BIT | SCR_FIQ_BIT);
+		isb();
+		/* dsb is good practice before using wfi to enter low power states */
+		dsb();
 
-			/* drop the count as soon as we exit wfi for the core */
-			STANDBY_CORES_CNT[0] = 0U;
-			STANDBY_CORES_CNT[1] = 0U;
-			FINISH_FLAG = 0;
-			/* INFO("\n3. dbg: %s: exit stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
+		/* Enter standby state */
+		wfi();
+
+		/* Restore SCR */
+		write_scr_el3(scr);
+
+
+		/* drop the count as soon as we exit wfi for the core */
+		STANDBY_CORES_CNT[0] = 0U;
+		STANDBY_CORES_CNT[1] = 0U;
+		FINISH_FLAG = 0;
+		/* INFO("\n3. dbg: %s: exit stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
 	}
+	else
+		INFO("PASS");
 }
 
 static void k3_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
