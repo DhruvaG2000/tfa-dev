@@ -27,7 +27,9 @@ unsigned int STANDBY_CORES_CNT[4];
 static void k3_cpu_standby(plat_local_state_t cpu_state)
 {
 	u_register_t scr;
-
+	int core;
+	core = plat_my_core_pos();
+	STANDBY_CORES_CNT[core] = 1U;
 	scr = read_scr_el3();
 	/* Enable the Non secure interrupt to wake the CPU */
 	write_scr_el3(scr | SCR_IRQ_BIT | SCR_FIQ_BIT);
@@ -40,6 +42,7 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 
 	/* Restore SCR */
 	write_scr_el3(scr);
+	STANDBY_CORES_CNT[core] = 0U;
 
 }
 
@@ -284,7 +287,7 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 		ti_sci_enter_sleep(proc_id, 0, k3_sec_entrypoint);
 	}
-	else if ( CORE_PWR_STATE(target_state) == PLAT_MAX_RET_STATE ) {
+	else if ( (CORE_PWR_STATE(target_state) == PLAT_MAX_RET_STATE) && (STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]) ) {
 		INFO("\n\nThis is where standby implementation should be");
 		/* Mode = 2 */
 
