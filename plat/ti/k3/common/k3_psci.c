@@ -28,21 +28,21 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 {
 	u_register_t scr;
 	int core;
-	volatile uint32_t* a53pll_ptr;
-	volatile uint32_t prev_state;
-	a53pll_ptr = (uint32_t*) (0x00680020);
-	prev_state = *a53pll_ptr;
+	/* volatile uint32_t* a53pll_ptr; */
+	/* volatile uint32_t prev_state; */
+	/* a53pll_ptr = (uint32_t*) (0x00680020); */
+	/* prev_state = *a53pll_ptr; */
 	core = plat_my_core_pos();
 	STANDBY_CORES_CNT[core] = 1U;
 	scr = read_scr_el3();
 	/* Enable the Non secure interrupt to wake the CPU */
 	write_scr_el3(scr | SCR_IRQ_BIT | SCR_FIQ_BIT);
 
-	if ( STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1] )
-	{
-		INFO ("\n Slowdown \n");
-		*a53pll_ptr = 0x80018013;
-	}
+	/* if ( STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1] ) */
+	/* { */
+	/* 	INFO ("\n Slowdown \n"); */
+	/* 	*a53pll_ptr = 0x80018013; */
+	/* } */
 
 	isb();
 	/* dsb is good practice before using wfi to enter low power states */
@@ -51,8 +51,8 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 	/* Enter standby state */
 	wfi();
 
-	if ( STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1] )
-		*a53pll_ptr = prev_state;
+	/* if ( STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1] ) */
+	/* 	*a53pll_ptr = prev_state; */
 	/* Restore SCR */
 	write_scr_el3(scr);
 	STANDBY_CORES_CNT[core] = 0U;
@@ -285,8 +285,13 @@ static int k3_validate_power_state(unsigned int power_state,
 static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int core, proc_id;
-	 volatile uint32_t* a53pll_ptr;
-	a53pll_ptr = (uint32_t*) (0x00680020);
+	 volatile uint32_t* a53pll_ptr, *cbass_pll;
+	volatile uint32_t prev_state_a53, prev_state_cbass;
+	cbass_pll = (uint32_t*) (0x00680080); // val=0x00008003 when devmem2
+	/* a53pll_ptr = (uint32_t*) (0x00688080); // val=18011 */
+	a53pll_ptr = (uint32_t*) (0x00688020); // val
+	prev_state_a53 = *a53pll_ptr;
+	prev_state_cbass = *cbass_pll;
 
 	core = plat_my_core_pos();
 	proc_id = PLAT_PROC_START_ID + core;
@@ -305,7 +310,7 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 		ti_sci_enter_sleep(proc_id, 0, k3_sec_entrypoint);
 	}
 	else if ( (CORE_PWR_STATE(target_state) == PLAT_MAX_RET_STATE) && (STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]) ) {
-		INFO("\n\nThis is where standby implementation should be");
+		/* INFO("\n\nThis is where standby implementation should be"); */
 		/* Mode = 2 */
 
 		u_register_t scr;
@@ -317,11 +322,14 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 		/* dsb is good practice before using wfi to enter low power states */
 		dsb();
 
-		*a53pll_ptr = 0x80018013;
+		*a53pll_ptr |= 0x80000000;
+		*cbass_pll |= 0x4F;
 		/* Enter standby state */
 		wfi();
 
-		*a53pll_ptr = 0x00018013;
+		*cbass_pll = prev_state_cbass;
+		*a53pll_ptr = prev_state_a53;
+
 		/* Restore SCR */
 		write_scr_el3(scr);
 
