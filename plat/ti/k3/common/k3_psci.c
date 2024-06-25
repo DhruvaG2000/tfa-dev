@@ -28,11 +28,22 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 {
 	u_register_t scr;
 	int core;
+	volatile uint32_t* a53pll_ptr;
+	volatile uint32_t prev_state;
+	a53pll_ptr = (uint32_t*) (0x00680020);
+	prev_state = *a53pll_ptr;
 	core = plat_my_core_pos();
 	STANDBY_CORES_CNT[core] = 1U;
 	scr = read_scr_el3();
 	/* Enable the Non secure interrupt to wake the CPU */
 	write_scr_el3(scr | SCR_IRQ_BIT | SCR_FIQ_BIT);
+
+	if ( STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1] )
+	{
+		INFO ("\n Slowdown \n");
+		*a53pll_ptr = 0x80018013;
+	}
+
 	isb();
 	/* dsb is good practice before using wfi to enter low power states */
 	dsb();
@@ -40,6 +51,8 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 	/* Enter standby state */
 	wfi();
 
+	if ( STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1] )
+		*a53pll_ptr = prev_state;
 	/* Restore SCR */
 	write_scr_el3(scr);
 	STANDBY_CORES_CNT[core] = 0U;
@@ -246,8 +259,10 @@ static int k3_validate_power_state(unsigned int power_state,
 
 
        if (pstate == PSTATE_TYPE_STANDBY) {
-               if (pwr_lvl != MPIDR_AFFLVL0)
+               if (pwr_lvl != MPIDR_AFFLVL0) {
+		ERROR("invalid params (%d)\n", pwr_lvl);
                        return PSCI_E_INVALID_PARAMS;
+	       }
 
 	       /* printf("dbg: %s : type standby core = %d", __func__, core); */
                /* req_state->pwr_domain_state[MPIDR_AFFLVL0] = PLAT_MAX_RET_STATE; */
@@ -270,6 +285,8 @@ static int k3_validate_power_state(unsigned int power_state,
 static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int core, proc_id;
+	 volatile uint32_t* a53pll_ptr;
+	a53pll_ptr = (uint32_t*) (0x00680020);
 
 	core = plat_my_core_pos();
 	proc_id = PLAT_PROC_START_ID + core;
@@ -300,9 +317,11 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 		/* dsb is good practice before using wfi to enter low power states */
 		dsb();
 
+		*a53pll_ptr = 0x80018013;
 		/* Enter standby state */
 		wfi();
 
+		*a53pll_ptr = 0x00018013;
 		/* Restore SCR */
 		write_scr_el3(scr);
 
@@ -314,7 +333,7 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 		/* INFO("\n3. dbg: %s: exit stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
 	}
 	else
-		INFO("PASS");
+		INFO("PASS\n");
 }
 
 static void k3_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
