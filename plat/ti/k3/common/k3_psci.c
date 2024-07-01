@@ -285,11 +285,13 @@ static int k3_validate_power_state(unsigned int power_state,
 static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int core, proc_id;
-	 volatile uint32_t* a53pll_ptr, *cbass_pll;
-	volatile uint32_t prev_state_a53, prev_state_cbass;
+	 volatile uint32_t* a53pll_ptr, *cbass_pll, *gtc_timer;
+	volatile uint32_t prev_state_a53, prev_state_cbass, time_suspend[3], time_resume[3];
 	cbass_pll = (uint32_t*) (0x00680080); // val=0x00008003 when devmem2
 	/* a53pll_ptr = (uint32_t*) (0x00688080); // val=18011 */
 	a53pll_ptr = (uint32_t*) (0x00688020); // val
+	gtc_timer = (uint32_t*) (0x00A90008);
+
 	prev_state_a53 = *a53pll_ptr;
 	prev_state_cbass = *cbass_pll;
 
@@ -312,6 +314,7 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 	else if ( (CORE_PWR_STATE(target_state) == PLAT_MAX_RET_STATE) && (STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]) ) {
 		/* INFO("\n\nThis is where standby implementation should be"); */
 		/* Mode = 2 */
+		time_suspend[0] = *gtc_timer;
 
 		u_register_t scr;
 
@@ -324,9 +327,11 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 		*a53pll_ptr |= 0x80000000;
 		*cbass_pll |= 0x4F;
+		time_suspend[1] = *gtc_timer;
 		/* Enter standby state */
 		wfi();
 
+		time_resume[0] = *gtc_timer;
 		*cbass_pll = prev_state_cbass;
 		*a53pll_ptr = prev_state_a53;
 
@@ -334,11 +339,15 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 		write_scr_el3(scr);
 
 
+		time_resume[1] = *gtc_timer;
 		/* drop the count as soon as we exit wfi for the core */
 		STANDBY_CORES_CNT[0] = 0U;
 		STANDBY_CORES_CNT[1] = 0U;
 		FINISH_FLAG = 0;
-		/* INFO("\n3. dbg: %s: exit stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
+
+		time_suspend[2] = time_suspend[1] - time_suspend[0];
+		time_resume[2] = time_resume[1] - time_resume[0];
+		INFO("3. dbg: %s: exit stdby, entry = 0x%x, exit = 0x%x\n", __func__, time_suspend[2], time_resume[2]);
 	}
 	else
 		INFO("PASS\n");
