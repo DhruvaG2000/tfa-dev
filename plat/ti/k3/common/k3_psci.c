@@ -24,6 +24,7 @@
 uintptr_t k3_sec_entrypoint;
 
 static volatile int once;
+static volatile unsigned int magic_word_lpm;
 static void k3_cpu_standby(plat_local_state_t cpu_state)
 {
 	int proc_id;
@@ -46,6 +47,8 @@ static void k3_cpu_standby(plat_local_state_t cpu_state)
 	wfi();
 	/* Restore SCR */
 	write_scr_el3(scr);
+
+	magic_word_lpm = 0xDEADBEEF;
 }
 
 static int k3_pwr_domain_on(u_register_t mpidr)

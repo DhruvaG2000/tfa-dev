@@ -1715,11 +1715,12 @@ int ti_sci_enter_sleep(uint8_t proc_id,
 {
 	struct ti_sci_msg_req_enter_sleep req;
 	struct ti_sci_xfer xfer;
+	struct ti_sci_msg_hdr resp;
 	int ret;
 
 	ret = ti_sci_setup_one_xfer(TI_SCI_MSG_ENTER_SLEEP, 0,
 				    &req, sizeof(req),
-				    NULL, 0,
+				    &resp, sizeof(resp),
 				    &xfer);
 	if (ret != 0U) {
 		ERROR("Message alloc failed (%d)\n", ret);
