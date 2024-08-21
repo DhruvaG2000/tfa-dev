@@ -23,9 +23,18 @@
 
 uintptr_t k3_sec_entrypoint;
 
+static volatile int once;
 static void k3_cpu_standby(plat_local_state_t cpu_state)
 {
+	int proc_id;
+	proc_id = PLAT_PROC_START_ID;
 	u_register_t scr;
+	VERBOSE("\ndbg: standby entry\n");
+
+	if (once)
+		ti_sci_enter_sleep(proc_id, 4, k3_sec_entrypoint);
+
+	once = 1;
 
 	scr = read_scr_el3();
 	/* Enable the Non secure interrupt to wake the CPU */
@@ -229,7 +238,25 @@ static void __dead2 k3_system_reset(void)
 static int k3_validate_power_state(unsigned int power_state,
 				   psci_power_state_t *req_state)
 {
-	/* TODO: perform the proper validation */
+	unsigned int i;
+	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
+	unsigned int pstate = psci_get_pstate_type(power_state);
+
+
+	if (pstate == PSTATE_TYPE_STANDBY) {
+		if (pwr_lvl != MPIDR_AFFLVL0)
+			return PSCI_E_INVALID_PARAMS;
+
+		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
+		INFO("dbg: standby validate?");
+	} else {
+		for (i = MPIDR_AFFLVL0; i <= pwr_lvl; i++)
+			req_state->pwr_domain_state[i] = PLAT_MAX_OFF_STATE;
+	}
+
+	if (psci_get_pstate_id(power_state))
+		return PSCI_E_INVALID_PARAMS;
+
 
 	return PSCI_E_SUCCESS;
 }
@@ -247,7 +274,24 @@ static void k3_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 	k3_pwr_domain_off(target_state);
 
-	ti_sci_enter_sleep(proc_id, 0, k3_sec_entrypoint);
+		if (is_local_state_off(CORE_PWR_STATE(target_state))) {
+			INFO("\n2. dbg: %s", __func__);
+			ti_sci_enter_sleep(proc_id, 0, k3_sec_entrypoint);
+		} else {
+			INFO("This is where standby implementation should be?");
+			/* INFO("\n3. dbg: %s: enter stdby %d", __func__, STANDBY_CORES_CNT[0] && STANDBY_CORES_CNT[1]); */
+			/* Prevent interrupts from spuriously waking up this cpu */
+			/* k3_gic_cpuif_disable(); */
+			/* k3_gic_save_context(); */
+
+			isb();
+			/* dsb is good practice before using wfi to enter low power states */
+			dsb();
+
+			/* Enter standby state */
+			wfi();
+
+		}
 }
 
 static void k3_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
