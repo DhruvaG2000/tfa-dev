@@ -24,3 +24,6 @@ USE_COHERENT_MEM	:=	1
 
 # In j784s4 we use the sec_proxy for TI SCI transport
 K3_TI_SCI_TRANSPORT    =       ${PLAT_PATH}/common/drivers/sec_proxy/sec_proxy.c
+
+K3_PSCI_SOURCES		+=	\
+				${PLAT_PATH}/common/k3_psci.c		\
