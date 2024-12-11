@@ -2,7 +2,7 @@
  * Texas Instruments System Control Interface Driver
  *   Based on Linux and U-Boot implementation
  *
- * Copyright (C) 2018-2024 Texas Instruments Incorporated - https://www.ti.com/
+ * Copyright (C) 2018-2025 Texas Instruments Incorporated - https://www.ti.com/
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,7 +16,7 @@
 #include <lib/bakery_lock.h>
 
 #include <common/debug.h>
-#include <sec_proxy.h>
+#include <ti_sci_transport.h>
 
 #include "ti_sci_protocol.h"
 #include "ti_sci.h"
@@ -34,8 +34,8 @@ DEFINE_BAKERY_LOCK(ti_sci_xfer_lock);
  * @rx_message:	Receive message
  */
 struct ti_sci_xfer {
-	struct k3_sec_proxy_msg tx_message;
-	struct k3_sec_proxy_msg rx_message;
+	struct ti_sci_msg tx_message;
+	struct ti_sci_msg rx_message;
 };
 
 /**
@@ -95,7 +95,7 @@ static int ti_sci_setup_one_xfer(uint16_t msg_type, uint32_t msg_flags,
  *
  * Return: 0 if all goes well, else appropriate error message
  */
-static int ti_sci_get_response(struct k3_sec_proxy_msg *msg,
+static int ti_sci_get_response(struct ti_sci_msg *msg,
 			       enum k3_sec_proxy_chan_id chan)
 {
 	struct ti_sci_msg_hdr *hdr;
@@ -104,7 +104,7 @@ static int ti_sci_get_response(struct k3_sec_proxy_msg *msg,
 
 	for (; retry > 0; retry--) {
 		/* Receive the response */
-		ret = k3_sec_proxy_recv(chan, msg);
+		ret = ti_sci_transport_recv(chan, msg);
 		if (ret) {
 			ERROR("Message receive failed (%d)\n", ret);
 			return ret;
@@ -145,21 +145,21 @@ static int ti_sci_get_response(struct k3_sec_proxy_msg *msg,
  */
 static int ti_sci_do_xfer(struct ti_sci_xfer *xfer)
 {
-	struct k3_sec_proxy_msg *tx_msg = &xfer->tx_message;
-	struct k3_sec_proxy_msg *rx_msg = &xfer->rx_message;
+	struct ti_sci_msg *tx_msg = &xfer->tx_message;
+	struct ti_sci_msg *rx_msg = &xfer->rx_message;
 	int ret;
 
 	bakery_lock_get(&ti_sci_xfer_lock);
 
 	/* Clear any spurious messages in receive queue */
-	ret = k3_sec_proxy_clear_rx_thread(SP_RESPONSE);
+	ret = ti_sci_transport_clear_rx_thread(SP_RESPONSE);
 	if (ret) {
 		ERROR("Could not clear response queue (%d)\n", ret);
 		goto unlock;
 	}
 
 	/* Send the message */
-	ret = k3_sec_proxy_send(SP_HIGH_PRIORITY, tx_msg);
+	ret = ti_sci_transport_send(SP_HIGH_PRIORITY, tx_msg);
 	if (ret) {
 		ERROR("Message sending failed (%d)\n", ret);
 		goto unlock;
@@ -1778,3 +1778,40 @@ int ti_sci_lpm_get_next_sys_mode(uint8_t *next_mode)
 
 	return 0;
 }
+
+#ifdef TI_K3_ENABLE_BOOT_NOTIFICATION
+/**
+ * ti_sci_boot_notification() - Boot notification from firmware
+ *
+ * This function is used to receive boot notification from firmware
+ * It indicates that the firmware is ready for communication
+ *
+ * Return: 0 if all goes well, else appropriate error message
+ */
+int ti_sci_boot_notification(void)
+{
+	int ret = 0;
+	struct ti_sci_boot_notification_msg boot_notification;
+	struct ti_sci_msg rx_message;
+
+	rx_message.buf = (void *)&boot_notification;
+	rx_message.len = sizeof(struct ti_sci_boot_notification_msg);
+
+	ret = ti_sci_transport_recv(SP_RESPONSE, &rx_message);
+	if (ret != 0U) {
+		ERROR("Failed to get boot notification (%d)\n", ret);
+		return ret;
+	}
+
+	/* Check for proper response ID */
+	if (boot_notification.hdr.type != TI_SCI_MSG_TIFS_BOOT_NOTIFICATION) {
+		ERROR("%s: Command expected 0x%x, but received 0x%x\n",
+		      __func__, TI_SCI_MSG_TIFS_BOOT_NOTIFICATION,
+		      boot_notification.hdr.type);
+		return -EINVAL;
+	}
+
+	ERROR("%s: boot notification received from TIFS\n", __func__);
+	return 0;
+}
+#endif /* TI_K3_ENABLE_BOOT_NOTIFICATION */

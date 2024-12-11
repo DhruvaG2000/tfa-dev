@@ -8,6 +8,9 @@
 K3_SEC_PROXY_LITE	:=	0
 $(eval $(call add_define,K3_SEC_PROXY_LITE))
 
+# Disable boot notification by default for this platform
+TI_K3_ENABLE_BOOT_NOTIFICATION	:=	0
+
 # Use a 4 cycle data RAM latency for J784s4
 K3_DATA_RAM_4_LATENCY	:=	1
 $(eval $(call add_define,K3_DATA_RAM_4_LATENCY))
@@ -18,3 +21,6 @@ $(eval $(call add_define,K3_EXCLUSIVE_SNOOP_DELAY))
 
 # System coherency is managed in hardware
 USE_COHERENT_MEM	:=	1
+
+# In j784s4 we use the sec_proxy for TI SCI transport
+K3_TI_SCI_TRANSPORT    =       ${PLAT_PATH}/common/drivers/sec_proxy/sec_proxy.c

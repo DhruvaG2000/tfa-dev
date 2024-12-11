@@ -2,7 +2,7 @@
  * Texas Instruments System Control Interface API
  *   Based on Linux and U-Boot implementation
  *
- * Copyright (C) 2018-2024 Texas Instruments Incorporated - https://www.ti.com/
+ * Copyright (C) 2018-2025 Texas Instruments Incorporated - https://www.ti.com/
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,6 +10,7 @@
 #ifndef TI_SCI_H
 #define TI_SCI_H
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -265,5 +266,12 @@ int ti_sci_enter_sleep(uint8_t proc_id,
 		       uint8_t mode,
 		       uint64_t core_resume_addr);
 int ti_sci_lpm_get_next_sys_mode(uint8_t *next_mode);
+
+#pragma weak ti_sci_boot_notification
+
+int ti_sci_boot_notification(void)
+{
+	return -EINVAL;
+}
 
 #endif /* TI_SCI_H */

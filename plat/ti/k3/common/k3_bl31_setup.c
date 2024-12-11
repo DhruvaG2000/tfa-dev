@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2025, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -19,6 +19,7 @@
 #include <k3_console.h>
 #include <k3_gicv3.h>
 #include <ti_sci.h>
+#include <ti_sci_transport.h>
 
 #define ADDR_DOWN(_adr) (_adr & XLAT_ADDR_MASK(2U))
 #define SIZE_UP(_adr, _sz) (round_up((_adr + _sz), XLAT_BLOCK_SIZE(2U)) - ADDR_DOWN(_adr))
@@ -124,6 +125,11 @@ void bl31_platform_setup(void)
 
 	k3_gic_driver_init(K3_GIC_BASE);
 	k3_gic_init();
+
+	ret = ti_sci_boot_notification();
+	if (ret) {
+		VERBOSE("Skipping boot notification for this device (%d)\n", ret);
+	}
 
 	ret = ti_sci_get_revision(&version);
 	if (ret) {
