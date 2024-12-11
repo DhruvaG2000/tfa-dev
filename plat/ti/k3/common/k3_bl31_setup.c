@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2024, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2025, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -124,6 +124,8 @@ void bl31_platform_setup(void)
 
 	k3_gic_driver_init(K3_GIC_BASE);
 	k3_gic_init();
+
+	ti_sci_boot_notification();
 
 	ret = ti_sci_get_revision(&version);
 	if (ret) {

@@ -5,7 +5,7 @@
  * The system works in a message response protocol
  * See: http://processors.wiki.ti.com/index.php/TISCI for details
  *
- * Copyright (C) 2018-2022 Texas Instruments Incorporated - https://www.ti.com/
+ * Copyright (C) 2018-2025 Texas Instruments Incorporated - https://www.ti.com/
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -82,6 +82,17 @@ struct ti_sci_msg_hdr {
  */
 struct ti_sci_msg_req_version {
 	struct ti_sci_msg_hdr hdr;
+} __packed;
+
+/**
+ * struct ti_sci_secure_msg_hdr - Header that prefixes all TISCI messages sent
+ *				  via secure transport.
+ * @checksum:	crc16 checksum for the entire message
+ * @reserved:	Reserved for future use.
+ */
+struct ti_sci_secure_msg_hdr {
+	uint16_t checksum;
+	uint16_t reserved;
 } __packed;
 
 /**
@@ -612,9 +623,9 @@ struct ti_sci_msg_req_set_proc_boot_config {
 } __packed;
 
 /* ARMV8 Control Flags */
-#define PROC_BOOT_CTRL_FLAG_ARMV8_ACINACTM      0x00000001
-#define PROC_BOOT_CTRL_FLAG_ARMV8_AINACTS       0x00000002
-#define PROC_BOOT_CTRL_FLAG_ARMV8_L2FLUSHREQ    0x00000100
+#define PROC_BOOT_CTRL_FLAG_ARMV8_ACINACTM      0x00000001U
+#define PROC_BOOT_CTRL_FLAG_ARMV8_AINACTS       0x00000002U
+#define PROC_BOOT_CTRL_FLAG_ARMV8_L2FLUSHREQ    0x00000100U
 
 /* R5 Control Flags */
 #define PROC_BOOT_CTRL_FLAG_R5_CORE_HALT        0x00000001
