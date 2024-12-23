@@ -30,4 +30,7 @@
  */
 #define MAILBOX_MAX_MESSAGE_SIZE	U(56)
 
+#define SCMI_SHMEM_ADDR		(0x70800000UL)
+#define SCMI_SHMEM_SIZE		(0x1000UL)	/* 4096 bytes */
+
 #endif /* BOARD_DEF_H */
