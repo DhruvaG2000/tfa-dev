@@ -67,4 +67,9 @@
 #error "MAILBOX_MAX_MESSAGE_SIZE > MAILBOX_RX_SLOT_SZ"
 #endif
 
+#define SCMI_SHMEM_ADDR		(0x70800000UL)
+#define SCMI_SHMEM_SIZE		(0x100UL)	/* 256 bytes */
+
+#define TI_SCMI_NO_OF_CHANNELS		U(0x1)
+
 #endif /* PLATFORM_DEF_H */
