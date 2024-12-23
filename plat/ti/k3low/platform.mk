@@ -15,6 +15,8 @@ include ${PLAT_PATH}/board/${TARGET_BOARD}/board.mk
 include drivers/ti/clk/ti_clk.mk
 include drivers/ti/pd/ti_pd.mk
 include ${PLAT_PATH}/common/pm/ti_soc_pm.mk
+include plat/ti/common/scmi/ti_scmi.mk
+
 
 BL32_BASE ?= 0x80200000
 $(eval $(call add_define,BL32_BASE))
@@ -59,14 +61,17 @@ ifeq (${IMAGE_BL1}, 1)
 override ENABLE_PIE := 0
 endif
 
-PLAT_INCLUDES		+= \
-				-I${PLAT_PATH}/board/${TARGET_BOARD}/include \
-				-I${PLAT_PATH} \
-				-Iplat/ti/common/include \
-				-I${PLAT_PATH}/common/drivers/firewall \
-				-I${PLAT_PATH}/common/drivers/k3-ddrss \
-				-I${PLAT_PATH}/common/drivers/k3-ddrss/common \
-				-I${PLAT_PATH}/common/drivers/k3-ddrss/16bit \
+PLAT_INCLUDES +=	\
+			-I${PLAT_PATH}/common/drivers/firewall \
+			-I${PLAT_PATH}/common/drivers/k3-ddrss \
+			-I${PLAT_PATH}/common/drivers/k3-ddrss/common \
+			-I${PLAT_PATH}/common/drivers/k3-ddrss/16bit \
+			-I${PLAT_PATH}/board/${TARGET_BOARD}/include	\
+			-I${PLAT_PATH}					\
+			-Idrivers/scmi-msg				\
+			-Iplat/ti/common/include			\
+			-Iplat/ti/common/scmi				\
+			-Idrivers/ti/clk/include		\
 
 K3_LPDDR4_SOURCES	+= \
 				${PLAT_PATH}/common/drivers/k3-ddrss/am62l_ddrss.c \
@@ -84,11 +89,15 @@ K3_TI_SCI_TRANSPORT	:= \
 BL31_SOURCES		+= \
 				drivers/delay_timer/delay_timer.c \
 				drivers/delay_timer/generic_delay_timer.c \
-				${K3_PSCI_SOURCES} \
-				${K3_TI_SCI_TRANSPORT} \
+				drivers/scmi-msg/base.c		\
+				drivers/scmi-msg/entry.c	\
+				drivers/scmi-msg/smt.c		\
+				${K3_PSCI_SOURCES}		\
+				${K3_TI_SCI_TRANSPORT}		\
 				${PLAT_PATH}/common/am62l_bl31_setup.c \
 				${PLAT_PATH}/common/am62l_topology.c \
 				${PLAT_PATH}/common/drivers/firewall/firewall_config.c \
+				plat/ti/common/ti_svc.c		\
 
 BL1_SOURCES		+= \
 				${PLAT_PATH}/common/am62l_bl1_setup.c \
