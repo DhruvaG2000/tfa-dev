@@ -12,6 +12,7 @@
 #include <platform_def.h>
 
 #include <arch_helpers.h>
+#include <assert.h>
 #include <common/debug.h>
 #include <lib/mmio.h>
 #include <lib/utils.h>
@@ -59,9 +60,11 @@ int ti_sci_transport_clear_rx_thread(enum k3_sec_proxy_chan_id id)
 int ti_sci_transport_send(enum k3_sec_proxy_chan_id id, const struct ti_sci_msg *msg)
 {
 	int num_bytes;
-	void *dst_ptr = (void *)AM62L_RSVD_SRAM_BASE;
+	void *dst_ptr = (void *)MAILBOX_TX_START_REGION;
 
 	num_bytes = msg->len / sizeof(uint8_t);
+
+	assert(num_bytes < MAILBOX_TX_REGION_SIZE);
 
 	/* move the buffer contents into the SRAM to be accessed by TIFS */
 	memmove(dst_ptr, msg->buf, num_bytes);
@@ -82,6 +85,10 @@ int ti_sci_transport_recv(enum k3_sec_proxy_chan_id id, struct ti_sci_msg *msg)
 	}
 
 	rcv_addr = mmio_read_32(TIFS_MAILBOX_BASE1 + TIFS_MAILBOX_MSG);
+
+	assert( (rcv_addr < TIFS_MESSAGE_RESP_END_REGION) &&
+		(rcv_addr > TIFS_MESSAGE_RESP_START_REGION) );
+
 	num_bytes = msg->len / sizeof(uint8_t);
 
 	for (int i = 0; i < num_bytes; i++) {
