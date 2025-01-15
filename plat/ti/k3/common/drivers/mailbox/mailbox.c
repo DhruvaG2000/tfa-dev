@@ -39,6 +39,7 @@ int ti_mailbox_poll_status(void)
 void ti_boot_notification(void)
 {
 	uint64_t rcv_addr;
+	struct ti_sci_boot_notification_msg *boot;
 
 	if (ti_mailbox_poll_status()) {
 		ERROR("Timeout waiting for boot notification\n");
@@ -47,7 +48,16 @@ void ti_boot_notification(void)
 
 	/* consume boot notification */
 	rcv_addr = mmio_read_32(TIFS_MAILBOX_BASE1 + TIFS_MAILBOX_MSG);
-	VERBOSE("%s: boot notification received from TIFS: 0x%lx\n", __func__, rcv_addr);
+	boot = (struct ti_sci_boot_notification_msg  *)(void *)rcv_addr;
+
+		/* Check for proper response ID */
+	if (boot->hdr.type != TI_SCI_MSG_TIFS_BOOT_NOTIFICATION) {
+		ERROR("%s: Command expected 0x%x, but received 0x%x\n",
+			__func__, TI_SCI_MSG_TIFS_BOOT_NOTIFICATION,
+			boot->hdr.type);
+		return;
+	}
+	VERBOSE("%s: boot notification received from TIFS\n", __func__);
 }
 
 int ti_sci_transport_clear_rx_thread(enum k3_sec_proxy_chan_id id)
