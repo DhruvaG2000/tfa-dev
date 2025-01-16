@@ -100,11 +100,13 @@ int ti_sci_transport_recv(enum k3_sec_proxy_chan_id id, struct ti_sci_msg *msg)
 		(rcv_addr > TIFS_MESSAGE_RESP_START_REGION) );
 
 	num_bytes = msg->len / sizeof(uint8_t);
+	num_bytes += sizeof(struct ti_sci_secure_msg_hdr);
 
 	for (int i = 0; i < num_bytes; i++) {
 		((uint8_t *)msg->buf)[i] = *(uint8_t *)(rcv_addr);
 		rcv_addr += sizeof(uint8_t);
 	}
+	memmove(msg->buf, &msg->buf[sizeof(struct ti_sci_secure_msg_hdr)], msg->len);
 
 	return 0;
 }
