@@ -36,7 +36,7 @@ int ti_mailbox_poll_status(void)
 	return 0;
 }
 
-void ti_boot_notification(void)
+void ti_sci_boot_notification(void)
 {
 	uint64_t rcv_addr;
 	struct ti_sci_boot_notification_msg *boot;
