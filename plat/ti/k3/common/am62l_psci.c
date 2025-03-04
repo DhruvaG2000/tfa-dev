@@ -85,7 +85,7 @@ static void am62l_pwr_domain_off(const psci_power_state_t *target_state)
 
 }
 
-static void __dead2 am62l_pwr_domain_off_wfi(const psci_power_state_t *target_state)
+static void __dead2 am62l_pwr_down_domain(const psci_power_state_t *target_state)
 {
 	int core;
 
@@ -96,9 +96,9 @@ static void __dead2 am62l_pwr_domain_off_wfi(const psci_power_state_t *target_st
 		VERBOSE("%s: A53 CORE: %d OFF\n", __func__, core);
 		scmi_handler_device_state_set_off(AM62LX_DEV_COMPUTE_CLUSTER0_A53_0 + core);
 	}
-
-	while (true)
+	while(true) {
 		wfi();
+	}
 }
 
 void am62l_pwr_domain_on_finish(const psci_power_state_t *target_state)
@@ -113,8 +113,9 @@ static void __dead2 am62l_system_reset(void)
 		      0x6);
 
 	ERROR("%s: Failed to reset device\n", __func__);
-	while (true)
+	while(true) {
 		wfi();
+	}
 }
 
 static int k3_validate_power_state(unsigned int power_state,
@@ -190,7 +191,7 @@ static void am62l_get_sys_suspend_power_state(psci_power_state_t *req_state)
 static plat_psci_ops_t am62l_plat_psci_ops = {
 	.pwr_domain_on = am62l_pwr_domain_on,
 	.pwr_domain_off = am62l_pwr_domain_off,
-	.pwr_domain_pwr_down_wfi = am62l_pwr_domain_off_wfi,
+	.pwr_domain_pwr_down = am62l_pwr_down_domain,
 	.pwr_domain_on_finish = am62l_pwr_domain_on_finish,
 #ifdef K3_AM62L_LPM
 	.pwr_domain_suspend = am62l_pwr_domain_suspend,
