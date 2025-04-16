@@ -151,6 +151,11 @@ static int k3_validate_power_state(unsigned int power_state,
 			return PSCI_E_INVALID_PARAMS;
 
 		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
+	} else if (pstate == PSTATE_TYPE_POWERDOWN) {
+		ERROR("PSTATE_TYPE_POWERDOWN not supported, but still attempted\n");
+		ERROR("Faking it internally to be same as STANDBY\n");
+		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
 	}
 
 	return PSCI_E_SUCCESS;
