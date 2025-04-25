@@ -34,6 +34,16 @@
 uintptr_t am62l_sec_entrypoint;
 uintptr_t am62l_sec_entrypoint_glob;
 
+#define K3_STATE_ID_LAST_IN_SHIFT	12
+#define K3_STATE_ID_LAST_IN_MASK	(0xf << K3_STATE_ID_SYSTEM_SHIFT)
+#define K3_STATE_ID_SYSTEM_SHIFT	8
+#define K3_STATE_ID_SYSTEM_MASK		(0xf << K3_STATE_ID_SYSTEM_SHIFT)
+#define K3_STATE_ID_CLUSTER_SHIFT	4
+#define K3_STATE_ID_CLUSTER_MASK	(0xf << K3_STATE_ID_CLUSTER_SHIFT)
+#define K3_STATE_ID_CORE_SHIFT		0
+#define K3_STATE_ID_CORE_MASK		(0xf << K3_STATE_ID_CORE_SHIFT)
+
+
 static void am62l_cpu_standby(plat_local_state_t cpu_state)
 {
 	u_register_t scr;
@@ -93,6 +103,14 @@ static int am62l_pwr_domain_on(u_register_t mpidr)
 
 static void am62l_pwr_domain_off(const psci_power_state_t *target_state)
 {
+
+	uint8_t system_pwr_state = SYSTEM_PWR_STATE(target_state);
+	uint8_t cluster_pwr_state = CLUSTER_PWR_STATE(target_state);
+	uint8_t core_pwr_state = CORE_PWR_STATE(target_state);
+
+	// TODO: Maybe handle specific new states here
+	VERBOSE("pwr domain off system %d, cluster %d, core %d\n", system_pwr_state, cluster_pwr_state, core_pwr_state);
+
 	/* At very least the local core should be powering down */
 	assert(CORE_PWR_STATE(target_state) == PLAT_MAX_OFF_STATE);
 
@@ -133,34 +151,50 @@ static void __dead2 am62l_system_reset(void)
 		wfi();
 }
 
+static __maybe_unused unsigned int k3_state_id_last_in_domain(unsigned int power_state)
+{
+	return (power_state & K3_STATE_ID_LAST_IN_MASK) >> K3_STATE_ID_LAST_IN_SHIFT;
+}
+
+static unsigned int k3_state_id_system_state(unsigned int power_state)
+{
+	return (power_state & K3_STATE_ID_SYSTEM_MASK) >> K3_STATE_ID_SYSTEM_SHIFT;
+}
+
+static unsigned int k3_state_id_cluster_state(unsigned int power_state)
+{
+	return (power_state & K3_STATE_ID_CLUSTER_MASK) >> K3_STATE_ID_CLUSTER_SHIFT;
+}
+
+static unsigned int k3_state_id_core_state(unsigned int power_state)
+{
+	return (power_state & K3_STATE_ID_CORE_MASK) >> K3_STATE_ID_CORE_SHIFT;
+}
+
 static int k3_validate_power_state(unsigned int power_state,
 				   psci_power_state_t *req_state)
 {
-	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
-	unsigned int pstate = psci_get_pstate_type(power_state);
+	// unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
+	// unsigned int pstate = psci_get_pstate_type(power_state);
+	unsigned int state_id = psci_get_pstate_id(power_state);
+	unsigned int system_state = k3_state_id_system_state(state_id);
+	unsigned int cluster_state = k3_state_id_cluster_state(state_id);
+	unsigned int core_state = k3_state_id_core_state(state_id);
 
-	if (pwr_lvl > PLAT_MAX_PWR_LVL)
-		return PSCI_E_INVALID_PARAMS;
+	VERBOSE("%s: power state: 0x%x\n", __func__, power_state);
 
-	if (pstate == PSTATE_TYPE_STANDBY) {
-		/*
-		 * It's possible to enter standby only on power level 0
-		 * Ignore any other power level.
-		 */
-		if (pwr_lvl != MPIDR_AFFLVL0)
-			return PSCI_E_INVALID_PARAMS;
+	req_state->pwr_domain_state[MPIDR_AFFLVL0] = core_state;
+	req_state->pwr_domain_state[MPIDR_AFFLVL1] = cluster_state;
+	req_state->pwr_domain_state[MPIDR_AFFLVL2] = system_state;
 
-		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
-	} else if (pstate == PSTATE_TYPE_POWERDOWN) {
-		ERROR("PSTATE_TYPE_POWERDOWN not supported, but still attempted\n");
-		ERROR("Faking it internally to be same as STANDBY\n");
-		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
-		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
-	}
+#if PSCI_OS_INIT_MODE
+	req_state->last_at_pwrlvl = k3_state_id_last_in_domain(state_id);
+#endif
 
 	return PSCI_E_SUCCESS;
 }
 
+volatile int dhruvaone = 1;
 #ifdef K3_AM62L_LPM
 static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
@@ -170,6 +204,15 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 	 * For now make mode=6 for RTC only + DDR and mdoe=0 for deepsleep
 	 */
 	uint32_t mode = 0;
+	uint8_t system_pwr_state = SYSTEM_PWR_STATE(target_state);
+	uint8_t cluster_pwr_state = CLUSTER_PWR_STATE(target_state);
+	uint8_t core_pwr_state = CORE_PWR_STATE(target_state);
+
+	// TODO: Maybe handle specific new states here
+	ERROR("suspend system %d, cluster %d, core %d\n", system_pwr_state, cluster_pwr_state, core_pwr_state);
+	return;
+	// HACK to return early
+	while (dhruvaone);
 
 	core = plat_my_core_pos();
 	proc_id = PLAT_PROC_START_ID + core;
