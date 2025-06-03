@@ -129,10 +129,10 @@ int ti_sci_transport_recv(enum ti_sci_transport_chan_id id, struct ti_sci_msg *m
 
 	rcv_addr = mmio_read_32(TI_MAILBOX_RX_BASE + TI_MAILBOX_MSG);
 
-	if (rcv_addr != MAILBOX_RX_START_REGION) {
-		ERROR("message address %lu is not valid\n", rcv_addr);
-		return -EINVAL;
-	}
+	/* if (rcv_addr != MAILBOX_RX_START_REGION) {
+	 * 	ERROR("message address %lu is not valid\n", rcv_addr);
+	 * 	return -EINVAL;
+	 * } */
 
 	if (num_bytes > MAILBOX_MAX_MESSAGE_SIZE) {
 		ERROR("message length %lu > max msg size\n", msg->len);
