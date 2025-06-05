@@ -11,6 +11,7 @@
 
 #define TI_MAILBOX_TX_BASE		UL(0x44240000) /* TFA sending IPC messages to TIFS */
 #define TI_MAILBOX_RX_BASE		UL(0x44250000) /* TIFS sending IPC messages to A53 */
+#define TI_MAILBOX_SIZE		UL(0x200) /* Both mailboxes are 512 bytes */
 
 #define WKUP_CTRL_MMR0_DEVICE_MANAGEMENT_BASE	(0x43050000UL)
 #define WKUP_CTRL_MMR0_DEVICE_RESET_OFFSET	(0x4000UL)
