@@ -1784,3 +1784,27 @@ int ti_sci_lpm_get_next_sys_mode(uint8_t *next_mode)
 
 	return 0;
 }
+
+void ti_sci_boot_notification(void)
+{
+	struct tisci_msg_boot_notification_resp resp;
+	struct ti_sci_msg rx_msg;
+	int ret;
+
+	rx_msg.buf = (uint8_t *)&resp;
+	rx_msg.len = sizeof(resp);
+
+	ret = ti_sci_get_response(&rx_msg, RX_SECURE_TRANSPORT_CHANNEL_ID);
+	if (ret != 0U) {
+		ERROR("Possible invalid response (%d)\n", ret);
+	}
+
+	/* Check for proper response ID */
+	if (resp.hdr.type != TI_SCI_MSG_BOOT_NOTIFICATION) {
+		ERROR("%s: Command expected 0x%x, but received 0x%x\n",
+			__func__, TI_SCI_MSG_BOOT_NOTIFICATION,
+			resp.hdr.type);
+		return;
+	}
+	VERBOSE("%s: boot notification received from TIFS\n", __func__);
+}
