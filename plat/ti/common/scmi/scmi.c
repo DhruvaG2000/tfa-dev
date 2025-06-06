@@ -26,6 +26,8 @@
 #include <device_pm.h>
 
 const uint8_t ti_scmi_protocol_table[] = {
+  	SCMI_PROTOCOL_ID_POWER_DOMAIN,
+	SCMI_PROTOCOL_ID_CLOCK,
 	0,
 };
 
