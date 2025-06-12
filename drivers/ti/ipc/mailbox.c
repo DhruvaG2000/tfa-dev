@@ -129,10 +129,20 @@ int ti_sci_transport_recv(enum ti_sci_transport_chan_id id, struct ti_sci_msg *m
 
 	rcv_addr = mmio_read_32(TI_MAILBOX_RX_BASE + TI_MAILBOX_MSG);
 
-	if (rcv_addr != MAILBOX_RX_START_REGION) {
+	/*
+	 * According to the TI SCI mailbox IPC design, the received message will
+	 * always lie in the fixed memory buffer region dedicated for IPC.
+	 * There values are defined in board specific board_def.h
+	 */
+	if (rcv_addr < MAILBOX_RX_START_REGION ||
+	    rcv_addr > (MAILBOX_RX_START_REGION +
+	    MAILBOX_RX_SLOT_SZ * (MAILBOX_RX_NUM_SLOTS - 1))) {
 		ERROR("message address %lu is not valid\n", rcv_addr);
 		return -EINVAL;
 	}
+
+	/* Ensure the RX Slot size is not bigger than the max message size */
+	assert(MAILBOX_MAX_MESSAGE_SIZE > MAILBOX_RX_SLOT_SZ);
 
 	if (num_bytes > MAILBOX_MAX_MESSAGE_SIZE) {
 		ERROR("message length %lu > max msg size\n", msg->len);

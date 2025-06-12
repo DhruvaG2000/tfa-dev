@@ -23,6 +23,10 @@
 /* Pre-decided SRAM Addresses for sending and receiving messages */
 #define MAILBOX_TX_START_REGION		UL(0x70814000)
 #define MAILBOX_RX_START_REGION		UL(0x70815000)
+/* 1 slot in the memory buffer dedicated for IPC is 64 bytes */
+#define MAILBOX_RX_SLOT_SZ		U(64)
+/* There are 5 slots in the memory buffer dedicated for IPC */
+#define MAILBOX_RX_NUM_SLOTS		U(5)
 /*
  * Pre-calculated MAX size of a message
  * sec_hdr + (type/host/seq + flags) + payload
