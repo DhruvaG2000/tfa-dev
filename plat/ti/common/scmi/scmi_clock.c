@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #include <plat_scmi_def.h>
-#include "scmi_clock.h"
+#include <scmi_clock.h>
 
 #include <drivers/scmi-msg.h>
 #include <drivers/scmi.h>

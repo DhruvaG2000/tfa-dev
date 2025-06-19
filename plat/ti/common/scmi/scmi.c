@@ -25,6 +25,7 @@
 #include <device_clk.h>
 #include <device_pm.h>
 
+#define MAX_PROTOCOL_IN_LIST            8U
 const uint8_t ti_scmi_protocol_table[] = {
   	SCMI_PROTOCOL_ID_POWER_DOMAIN,
 	SCMI_PROTOCOL_ID_CLOCK,
