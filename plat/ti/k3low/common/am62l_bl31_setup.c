@@ -25,6 +25,24 @@ const mmap_region_t plat_k3_mmap[] = {
 
 int ti_soc_init(void)
 {
-	/* nothing to do right now */
+	struct ti_sci_msg_version version;
+	int ret;
+
+	generic_delay_timer_init();
+
+	ti_sci_boot_notification();
+
+	ret = ti_sci_get_revision(&version);
+	if (ret) {
+		ERROR("Unable to communicate with the control firmware (%d)\n", ret);
+		return ret;
+	}
+
+	NOTICE("SYSFW ABI: %d.%d (firmware rev 0x%04x '%s')\n",
+	     version.abi_major, version.abi_minor,
+	     version.firmware_revision,
+	     version.firmware_description);
+
+
 	return 0;
 }
