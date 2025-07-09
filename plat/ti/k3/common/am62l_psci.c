@@ -28,6 +28,8 @@
 
 volatile unsigned int val_mdctl;
 volatile unsigned int val_mdstat;
+volatile uint32_t am62l_lpm_state = 0;
+/*********** PROC BOOT CODE ******************/
 
 /* power domain indices */
 #define PD_MPU_CLST		4
@@ -277,6 +279,7 @@ static int k3_validate_power_state(unsigned int power_state,
 	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
 	unsigned int pstate = psci_get_pstate_type(power_state);
 
+	// NOTICE("Power state: 0x%x\n", power_state);
 	if (pwr_lvl > PLAT_MAX_PWR_LVL)
 		return PSCI_E_INVALID_PARAMS;
 
@@ -289,6 +292,13 @@ static int k3_validate_power_state(unsigned int power_state,
 			return PSCI_E_INVALID_PARAMS;
 
 		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
+	} else if (pstate &= PSTATE_TYPE_POWERDOWN) {
+		ERROR("PSTATE_TYPE_POWERDOWN not supported RN 0x%x...\n", power_state);
+			// return PSCI_E_INVALID_PARAMS;
+		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		CLUSTER_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		am62l_lpm_state = power_state == 0x13333 ? 0 : 6;
 	}
 
 	return PSCI_E_SUCCESS;
@@ -302,7 +312,7 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 	/* TODO: Pass the mode passed from kernel using s2idle
 	 * For now make mode=6 for RTC only + DDR and mdoe=0 for deepsleep
 	 */
-	uint32_t mode = 0;
+	uint32_t mode = am62l_lpm_state;
 
 	core = plat_my_core_pos();
 	proc_id = PLAT_PROC_START_ID + core;
