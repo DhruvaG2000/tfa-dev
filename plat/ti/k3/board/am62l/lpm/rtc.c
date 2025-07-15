@@ -136,7 +136,7 @@ void rtc_suspend(void)
 	mmio_write_32(K3_RTC_BASE + RTC_GENRAL_CTL, ctrl);
 	/* Enable all wake up interrupt */
 	ctrl = mmio_read_32(K3_RTC_BASE + RTC_IRQENABLE_SET_SYS);
-	ctrl |= 0x1C;
+	ctrl |= 0x1F;
 	mmio_write_32(K3_RTC_BASE + RTC_IRQENABLE_SET_SYS, ctrl);
 	rtc_lock();
 
