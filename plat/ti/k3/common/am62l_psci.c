@@ -250,6 +250,7 @@ static int k3_validate_power_state(unsigned int power_state,
 	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
 	unsigned int pstate = psci_get_pstate_type(power_state);
 
+	// NOTICE("Power state: 0x%x\n", power_state);
 	if (pwr_lvl > PLAT_MAX_PWR_LVL)
 		return PSCI_E_INVALID_PARAMS;
 
@@ -262,9 +263,12 @@ static int k3_validate_power_state(unsigned int power_state,
 			return PSCI_E_INVALID_PARAMS;
 
 		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
-	} else if (pstate == PSTATE_TYPE_POWERDOWN) {
-		ERROR("PSTATE_TYPE_POWERDOWN not supported RN...\n");
+	} else if (pstate &= PSTATE_TYPE_POWERDOWN) {
+		ERROR("PSTATE_TYPE_POWERDOWN not supported RN 0x%x...\n", power_state);
+			// return PSCI_E_INVALID_PARAMS;
 		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		CLUSTER_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 	}
 
 	return PSCI_E_SUCCESS;
