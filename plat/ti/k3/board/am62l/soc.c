@@ -31,16 +31,16 @@ const mmap_region_t plat_k3_mmap[] = {
  * unable to reparent. Force the clock parent from here till proper
  * fix is implemented in linux
  */
-static void ti_force_adc_parent(void)
-{
-	INFO("0_ADC0's parent is %d\n", plat_scmi_clock_get_parent(0, 0));
-	if (!plat_scmi_clock_set_parent(0, 0, 2)) {
-		INFO("0_ADC0's parent (after set_parent) is %d\n",
-		       plat_scmi_clock_get_parent(0, 0));
-	} else {
-		WARN("ADC set_parent failed!\n");
-	}
-}
+// static void ti_force_adc_parent(void)
+// {
+// 	INFO("0_ADC0's parent is %d\n", plat_scmi_clock_get_parent(0, 0));
+// 	if (!plat_scmi_clock_set_parent(0, 0, 2)) {
+// 		INFO("0_ADC0's parent (after set_parent) is %d\n",
+// 		       plat_scmi_clock_get_parent(0, 0));
+// 	} else {
+// 		WARN("ADC set_parent failed!\n");
+// 	}
+// }
 
 int ti_soc_init(void)
 {
@@ -83,7 +83,7 @@ int ti_soc_init(void)
 		return ret;
 	}
 
-	ti_force_adc_parent();
+	// ti_force_adc_parent();
 
 	return 0;
 }
