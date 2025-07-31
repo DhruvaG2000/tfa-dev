@@ -161,11 +161,17 @@ int32_t plat_scmi_clock_get_possible_parents(unsigned int agent_id,
 	*nb_elts = (uint64_t)scmi_handler_clock_get_num_clock_parents(clock->dev_id,
 									clock->clock_id);
 	if (plat_possible_parents) {
-		for (uint32_t i = 0; i < (uint32_t)*nb_elts ; i++) {
-			plat_possible_parents[i] = i;
+		if(scmi_id == 18 || scmi_id == 4 || scmi_id == 488) {
+			for (uint32_t i = 0; i < (uint32_t)*nb_elts ; i++) {
+				plat_possible_parents[i] = scmi_id - i -1;
+			}
+		} else {
+			for (uint32_t i = 0; i < (uint32_t)*nb_elts ; i++) {
+				plat_possible_parents[i] = i;
+			}
 		}
 	}
-	VERBOSE("num_parents %d\n", (uint32_t)*nb_elts);
+		VERBOSE("num_parents %d\n", (uint32_t)*nb_elts);
 	return SCMI_SUCCESS;
 }
 
