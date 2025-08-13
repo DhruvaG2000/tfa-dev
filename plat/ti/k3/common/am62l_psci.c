@@ -134,6 +134,8 @@ static void __unused set_main_psc_state(uint32_t pd_id, uint32_t md_id, uint32_t
 
 
 /*********** PROC BOOT CODE ENDS******************/
+#include <drivers/arm/gicv3.h>
+#include <lib/utils_def.h>
 
 #define CORE_PWR_STATE(state) ((state)->pwr_domain_state[MPIDR_AFFLVL0])
 #define CLUSTER_PWR_STATE(state) ((state)->pwr_domain_state[MPIDR_AFFLVL1])
@@ -161,9 +163,12 @@ static void am62l_cpu_standby(plat_local_state_t cpu_state)
 	write_scr_el3(scr);
 }
 
+static u_register_t globmpidr;
+
 static int am62l_pwr_domain_on(u_register_t mpidr)
 {
 	int core, proc_id, ret;
+	globmpidr = mpidr;
 
 	core = plat_core_pos_by_mpidr(mpidr);
 	if (core < 0) {
@@ -323,6 +328,18 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 	ti_init_scmi_server();
 	k3_lpm_stub_copy_to_sram();
 	rtc_resume();
+
+	ERROR("!!! GIC Fake IRQs");
+	gicv3_set_spi_routing(124, GICV3_IRM_ANY, globmpidr);
+	gicv3_enable_interrupt(124, 1);
+	gicv3_enable_interrupt(124, 0);
+	gicv3_set_interrupt_pending(124, 1);
+	gicv3_set_interrupt_pending(124, 0);
+	// gicv3_raise_sgi(92, globmpidr);
+	plat_ic_raise_ns_sgi(124, globmpidr);
+
+	ERROR("SANITY: active? %d", gicv3_get_interrupt_active(124,0));
+	ERROR("SANITY: active 1? %d", gicv3_get_interrupt_active(124,1));
 }
 
 static void am62l_get_sys_suspend_power_state(psci_power_state_t *req_state)
