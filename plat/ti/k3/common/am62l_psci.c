@@ -157,6 +157,10 @@ set_main_psc_state(uint32_t pd_id, uint32_t md_id, uint32_t pd_state, uint32_t m
 	INFO("%s: after: md_id=%d, mdstat=0x%x, pdstat=0x%x\n", __func__, md_id, mdstat, pdstat);
 }
 
+/*********** PROC BOOT CODE ENDS******************/
+#include <drivers/arm/gicv3.h>
+#include <lib/utils_def.h>
+
 #define CORE_PWR_STATE(state) ((state)->pwr_domain_state[MPIDR_AFFLVL0])
 #define CLUSTER_PWR_STATE(state) ((state)->pwr_domain_state[MPIDR_AFFLVL1])
 #define SYSTEM_PWR_STATE(state) ((state)->pwr_domain_state[PLAT_MAX_PWR_LVL])
@@ -183,9 +187,12 @@ static void am62l_cpu_standby(plat_local_state_t cpu_state)
 	write_scr_el3(scr);
 }
 
+static u_register_t globmpidr;
+
 static int am62l_pwr_domain_on(u_register_t mpidr)
 {
 	int core, proc_id, ret;
+	globmpidr = mpidr;
 
 	core = plat_core_pos_by_mpidr(mpidr);
 	if (core < 0) {
@@ -278,6 +285,7 @@ static int k3_validate_power_state(unsigned int power_state,
 {
 	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
 	unsigned int pstate = psci_get_pstate_type(power_state);
+	unsigned int core = plat_my_core_pos();
 
 	// NOTICE("Power state: 0x%x\n", power_state);
 	if (pwr_lvl > PLAT_MAX_PWR_LVL)
@@ -293,11 +301,11 @@ static int k3_validate_power_state(unsigned int power_state,
 
 		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
 	} else if (pstate &= PSTATE_TYPE_POWERDOWN) {
-		ERROR("PSTATE_TYPE_POWERDOWN not supported RN 0x%x...\n", power_state);
-			// return PSCI_E_INVALID_PARAMS;
+		ERROR("PSTATE_TYPE_POWERDOWN (core %d) state = 0x%x...\n", core, power_state);
 		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		CLUSTER_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		// 0x13333 is the same as DEEPSLEEP
 		am62l_lpm_state = power_state == 0x13333 ? 0 : 6;
 	}
 
@@ -349,6 +357,16 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 	ti_init_scmi_server();
 	k3_lpm_stub_copy_to_sram();
 	clks_resume();
+
+	ERROR("!!! GIC Fake IRQs");
+	/* working 60 irqnum for RTC. Still doesn't trigger irqhandler but wake up system */
+	gicv3_set_spi_routing(60, GICV3_IRM_ANY, globmpidr);
+	gicv3_enable_interrupt(60, 0);
+	gicv3_set_interrupt_pending(60, 0);
+	plat_ic_raise_ns_sgi(60, globmpidr);
+	// I2c
+
+	ERROR("SANITY: active? %d", gicv3_get_interrupt_active(60,0));
 }
 
 static void am62l_get_sys_suspend_power_state(psci_power_state_t *req_state)
