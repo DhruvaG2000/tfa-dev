@@ -6,9 +6,13 @@
  */
 
 #include <common/debug.h>
+
+#include <ti_clk_handler.h>
 #include <ti_sci.h>
 #include <ti_sci_protocol.h>
 #include <ti_sci_transport.h>
+
+#include <ti_plat_scmi_def.h>
 
 #include <board_def.h>
 #include <firewall.h>
@@ -33,6 +37,8 @@ int ti_soc_init(void)
 	int ret;
 
 	generic_delay_timer_init();
+
+	ti_init_scmi_server();
 
 	ret = ti_sci_boot_notification();
 	if (ret != 0) {

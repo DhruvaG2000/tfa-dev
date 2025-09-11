@@ -11,7 +11,17 @@
 #include <platform_def.h>
 #include <ti_plat_scmi_def.h>
 
+#include <ti_clk.h>
+#include <ti_clk_handler.h>
+#include <ti_clocks.h>
+#include <ti_device.h>
+#include <ti_device_clk.h>
+#include <ti_device_pm.h>
+#include <ti_devices.h>
+
 const uint8_t ti_scmi_protocol_table[] = {
+	SCMI_PROTOCOL_ID_POWER_DOMAIN,
+	SCMI_PROTOCOL_ID_CLOCK,
 	0,
 };
 
@@ -67,6 +77,21 @@ void ti_init_scmi_server(void)
 {
 	size_t i;
 
+	VERBOSE("%s: clock and device init started!\n", __func__);
+	if (ti_clk_init()) {
+		ERROR("%s: Clock init failed!\n", __func__);
+		panic();
+	}
+
+	/* Register clock handlers before activating SCMI channels */
+	ti_clk_handler_init();
+
+	if (ti_devices_init()) {
+		ERROR("%s: Devices init failed!\n", __func__);
+		panic();
+	}
+
+	/* Activate SCMI channels with handlers ready */
 	for (i = 0U; i < TI_SCMI_NO_OF_CHANNELS; i++) {
 		scmi_smt_init_agent_channel(&ti_scmi_channel[i]);
 	}
