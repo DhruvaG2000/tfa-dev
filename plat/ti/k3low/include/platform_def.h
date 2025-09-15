@@ -72,4 +72,8 @@
 
 #define TI_SCMI_NO_OF_CHANNELS		U(0x1)
 
+/* Device Control Region - covers PSC, PLL, and other control registers */
+#define K3LOW_DEVCTRL_BASE    UL(0x200000)    /* Start of device control registers */
+#define K3LOW_DEVCTRL_SIZE    UL(0x9380000)   /* Size of device control region */
+
 #endif /* PLATFORM_DEF_H */
