@@ -28,6 +28,8 @@
 
 volatile unsigned int val_mdctl;
 volatile unsigned int val_mdstat;
+volatile uint32_t am62l_lpm_state = 0;
+/*********** PROC BOOT CODE ******************/
 
 /* power domain indices */
 #define PD_MPU_CLST		4
@@ -303,6 +305,7 @@ static int k3_validate_power_state(unsigned int power_state,
 		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		CLUSTER_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		am62l_lpm_state = power_state == 0x13333 ? 0 : 6;
 	}
 
 	return PSCI_E_SUCCESS;
@@ -316,7 +319,7 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 	/* TODO: Pass the mode passed from kernel using s2idle
 	 * For now make mode=6 for RTC only + DDR and mdoe=0 for deepsleep
 	 */
-	uint32_t mode = 0;
+	uint32_t mode = am62l_lpm_state;
 
 	core = plat_my_core_pos();
 	proc_id = PLAT_PROC_START_ID + core;
