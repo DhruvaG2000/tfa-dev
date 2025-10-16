@@ -29,6 +29,7 @@
 volatile unsigned int val_mdctl;
 volatile unsigned int val_mdstat;
 volatile uint32_t am62l_lpm_state = 0;
+volatile uint32_t am62l_lpm_core_status[2] = {1, 1}; // 0 is suspended 1 is running
 /*********** PROC BOOT CODE ******************/
 
 /* power domain indices */
@@ -247,6 +248,7 @@ static void __dead2 am62l_pwr_domain_off_wfi(const psci_power_state_t *target_st
 	int core;
 	core = plat_my_core_pos();
 
+	k3_gic_cpuif_disable();
 	/* If our cluster is not going down we stop here */
 	if (CLUSTER_PWR_STATE(target_state) != PLAT_MAX_OFF_STATE) {
 		VERBOSE("%s: A53 CORE: %d OFF\n", __func__, core);
@@ -307,6 +309,7 @@ static int k3_validate_power_state(unsigned int power_state,
 		SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		// 0x13333 is the same as DEEPSLEEP
 		am62l_lpm_state = power_state == 0x13333 ? 0 : 6;
+		am62l_lpm_core_status[core] = 0;
 	}
 
 	return PSCI_E_SUCCESS;
@@ -324,6 +327,17 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 	core = plat_my_core_pos();
 	proc_id = PLAT_PROC_START_ID + core;
+
+	if (core == 1) {
+		k3_gic_cpuif_disable();
+		device_id_drop_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0);
+		set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
+				   PSC_PD_OFF, PSC_SYNCRESETDISABLE);
+		NOTICE("Suspend Sequence in ATF completing early\n");
+		return;
+	} else {
+		NOTICE("Suspend Sequence in LPM\n");
+	}
 
 	/* Prevent interrupts from spuriously waking up this cpu */
 	k3_gic_cpuif_disable();
@@ -347,6 +361,30 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 
 static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 {
+	int core = plat_my_core_pos();
+	int proc_id;
+
+	if (core == 1) {
+		NOTICE("Suspend fin Sequence in ATF completing early\n");
+		proc_id = PLAT_PROC_START_ID + core;	// should be 0x21
+
+		VERBOSE("proc_id = 0x%x\n", proc_id);
+
+		ti_sci_proc_request(proc_id);
+
+		ti_sci_proc_set_boot_cfg(proc_id, am62l_sec_entrypoint, 0, 0);
+
+		/* sanity check these are off before starting a core */
+		ti_sci_proc_set_boot_ctrl(proc_id,
+				0, PROC_BOOT_CTRL_FLAG_ARMV8_L2FLUSHREQ |
+				PROC_BOOT_CTRL_FLAG_ARMV8_AINACTS |
+				PROC_BOOT_CTRL_FLAG_ARMV8_ACINACTM);
+
+		set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
+				PSC_PD_ON, PSC_ENABLE);
+		device_id_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0_A53_0 + core);
+		return;
+	}
 	/* Remove the I/O isolation */
 	k3_lpm_set_io_isolation(false);
 	/* Initialize the console to provide early debug support */
