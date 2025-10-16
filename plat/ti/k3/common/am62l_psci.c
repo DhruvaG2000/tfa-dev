@@ -285,6 +285,7 @@ static int k3_validate_power_state(unsigned int power_state,
 {
 	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
 	unsigned int pstate = psci_get_pstate_type(power_state);
+	unsigned int core = plat_my_core_pos();
 
 	// NOTICE("Power state: 0x%x\n", power_state);
 	if (pwr_lvl > PLAT_MAX_PWR_LVL)
@@ -300,11 +301,11 @@ static int k3_validate_power_state(unsigned int power_state,
 
 		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
 	} else if (pstate &= PSTATE_TYPE_POWERDOWN) {
-		ERROR("PSTATE_TYPE_POWERDOWN not supported RN 0x%x...\n", power_state);
-			// return PSCI_E_INVALID_PARAMS;
+		ERROR("PSTATE_TYPE_POWERDOWN (core %d) state = 0x%x...\n", core, power_state);
 		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		CLUSTER_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		// 0x13333 is the same as DEEPSLEEP
 		am62l_lpm_state = power_state == 0x13333 ? 0 : 6;
 	}
 
@@ -358,16 +359,17 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 	clks_resume();
 
 	ERROR("!!! GIC Fake IRQs");
-	gicv3_set_spi_routing(124, GICV3_IRM_ANY, globmpidr);
-	gicv3_enable_interrupt(124, 1);
-	gicv3_enable_interrupt(124, 0);
-	gicv3_set_interrupt_pending(124, 1);
-	gicv3_set_interrupt_pending(124, 0);
-	// gicv3_raise_sgi(92, globmpidr);
-	plat_ic_raise_ns_sgi(124, globmpidr);
+	/* working 60 irqnum for RTC. Still doesn't trigger irqhandler but wake up system */
+	gicv3_set_spi_routing(60, GICV3_IRM_ANY, globmpidr);
+	gicv3_enable_interrupt(60, 1);
+	gicv3_enable_interrupt(60, 0);
+	gicv3_set_interrupt_pending(60, 1);
+	gicv3_set_interrupt_pending(60, 0);
+	plat_ic_raise_ns_sgi(60, globmpidr);
+	// I2c
 
-	ERROR("SANITY: active? %d", gicv3_get_interrupt_active(124,0));
-	ERROR("SANITY: active 1? %d", gicv3_get_interrupt_active(124,1));
+	ERROR("SANITY: active? %d", gicv3_get_interrupt_active(60,0));
+	ERROR("SANITY: active 1? %d", gicv3_get_interrupt_active(60,1));
 }
 
 static void am62l_get_sys_suspend_power_state(psci_power_state_t *req_state)
