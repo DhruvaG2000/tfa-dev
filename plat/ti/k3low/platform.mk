@@ -54,6 +54,10 @@ ifeq (${IMAGE_BL1}, 1)
 override ENABLE_PIE := 0
 endif
 
+# We need to enable this for robust clocking
+CONFIG_CLK_PLL_16FFT_FRACF_CALIBRATION := 1
+$(eval $(call add_define,CONFIG_CLK_PLL_16FFT_FRACF_CALIBRATION))
+
 PLAT_INCLUDES		+= \
 				-I${PLAT_PATH}/board/${TARGET_BOARD}/include \
 				-I${PLAT_PATH} \
