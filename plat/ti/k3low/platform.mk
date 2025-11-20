@@ -9,6 +9,7 @@ TARGET_BOARD	?=	am62lx-evm
 
 include plat/ti/common/plat_common.mk
 include ${PLAT_PATH}/board/${TARGET_BOARD}/board.mk
+include drivers/ti/clk/ti_clk.mk
 
 BL32_BASE ?= 0x80200000
 $(eval $(call add_define,BL32_BASE))
