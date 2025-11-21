@@ -187,6 +187,45 @@ static void am62l_cpu_standby(plat_local_state_t cpu_state)
 	write_scr_el3(scr);
 }
 
+static int __maybe_unused am62l_loc_pwr_on(int core) {
+	int proc_id = PLAT_PROC_START_ID + core;	// should be 0x21
+	int ret;
+
+	INFO("loc_pwr proc_id = 0x%x\n", proc_id);
+
+	ret = ti_sci_proc_request(proc_id);
+	if (ret) {
+		ERROR("Request for processor failed: %d\n", ret);
+		return PSCI_E_INTERN_FAIL;
+	}
+
+	ret = ti_sci_proc_set_boot_cfg(proc_id, am62l_sec_entrypoint, 0, 0);
+	if (ret) {
+		ERROR("Request to set core boot address failed: %d\n", ret);
+		return PSCI_E_INTERN_FAIL;
+	}
+
+	/* sanity check these are off before starting a core */
+	ret = ti_sci_proc_set_boot_ctrl(proc_id,
+					0, PROC_BOOT_CTRL_FLAG_ARMV8_L2FLUSHREQ |
+					PROC_BOOT_CTRL_FLAG_ARMV8_AINACTS |
+					PROC_BOOT_CTRL_FLAG_ARMV8_ACINACTM);
+	if (ret) {
+		ERROR("Request to clear boot configuration failed: %d\n", ret);
+		return PSCI_E_INTERN_FAIL;
+	}
+
+	set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
+			   PSC_PD_ON, PSC_ENABLE);
+	device_id_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0_A53_0 + core);
+
+	k3_gic_pcpu_init();
+	k3_gic_cpuif_enable();
+
+	return PSCI_E_SUCCESS;
+
+}
+
 static int am62l_pwr_domain_on(u_register_t mpidr)
 {
 	int core, proc_id, ret;
@@ -226,6 +265,7 @@ static int am62l_pwr_domain_on(u_register_t mpidr)
 	set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
 			   PSC_PD_ON, PSC_ENABLE);
 	device_id_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0_A53_0 + core);
+
 
 	return PSCI_E_SUCCESS;
 }
@@ -296,30 +336,56 @@ static int k3_validate_power_state(unsigned int power_state,
 			return PSCI_E_INVALID_PARAMS;
 
 		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
-	} else if (pstate && PSTATE_TYPE_POWERDOWN) {
-		INFO("%s: (core %d): s2idle: power_state: 0x%x\n", __func__, core, power_state);
-		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
-		CLUSTER_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
-		SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+	} else if (pstate == PSTATE_TYPE_POWERDOWN) {
+		if (power_state == 0x2012233) {
+			CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+		} else if (power_state == 0x2012234 || power_state == 0x2012235) {
+			INFO("%s: (core %d): s2idle: power_state: 0x%x\n", __func__, core, power_state);
+			CLUSTER_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+			SYSTEM_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
+			am62l_lpm_state = power_state == 0x2012234 ? 0 : 6;
+		}
 		// 0x2012231=Deep Sleep: comes from DT idle-state suspend param
-		am62l_lpm_state = power_state == 0x2012231 ? 0 : 6;
 	}
 
 	return PSCI_E_SUCCESS;
 }
 
 #ifdef K3_AM62L_LPM
+volatile long int timeout_local = 0xFFFFFFFF;
 static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int core, proc_id;
 	uint64_t  context_save_addr = 0x80A00000;
+	timeout_local = 0xFFFFFFFF;
+
+	core = plat_my_core_pos();
+	proc_id = PLAT_PROC_START_ID + core;
+
+	if (CLUSTER_PWR_STATE(target_state) != PLAT_MAX_OFF_STATE &&
+			SYSTEM_PWR_STATE(target_state) != PLAT_MAX_OFF_STATE) {
+		k3_gic_cpuif_disable();
+		VERBOSE("\n%s: A53 CORE: %d OFF\n", __func__, core);
+		/*
+		 * Now queue up the core shutdown request.
+		 * Also drop the power up reference that was increased as part
+		 * of scmi_handler_device_state_set_on earlier
+		 */
+		device_id_drop_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0);
+		set_main_psc_state(PD_MPU_CLST_CORE_0 + 1, LPSC_MAIN_MPU_CLST_CORE_0 + 1,
+				   PSC_PD_OFF, PSC_SYNCRESETDISABLE);
+		while (true)
+			wfi();
+
+		return;
+	}
+
 	/*
 	 * mode=6 for RTC only + DDR and mode=0 for deepsleep
 	 */
 	uint32_t mode = am62l_lpm_state;
 
-	core = plat_my_core_pos();
-	proc_id = PLAT_PROC_START_ID + core;
+	while (timeout_local--);
 
 	/* Prevent interrupts from spuriously waking up this cpu */
 	k3_gic_cpuif_disable();
@@ -329,7 +395,7 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 	if ((mode == 0) || (mode == 6)) {
 		INFO("Started Suspend Sequence in ATF\n");
 		/* Isolate the I/Os to allow I/O Daisy chain wakeup */
-		k3_lpm_set_io_isolation(true);
+		// k3_lpm_set_io_isolation(true);
 		k3_lpm_config_magic_words(mode);
 		ti_sci_prepare_sleep(mode, context_save_addr, 0);
 		INFO("sent prepare message\n");
@@ -338,13 +404,15 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 		INFO("sent enter sleep message\n");
 	}
 
+	INFO("!!DHG Suspend Sequence in ATF core(%d)\n", core);
 	k3_suspend_to_ram(mode);
 }
 
 static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 {
 	/* Remove the I/O isolation */
-	k3_lpm_set_io_isolation(false);
+	// k3_lpm_set_io_isolation(false);
+	INFO("!!DHG resume Sequence in ATF core\n");
 	/* Initialize the console to provide early debug support */
 	k3_console_setup();
 	k3_config_wake_sources(false);
@@ -359,6 +427,7 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 	gicv3_enable_interrupt(60, 0);
 	gicv3_set_interrupt_pending(60, 0);
 	plat_ic_raise_ns_sgi(60, 0);
+	// am62l_loc_pwr_on(1);
 }
 
 static void am62l_get_sys_suspend_power_state(psci_power_state_t *req_state)
