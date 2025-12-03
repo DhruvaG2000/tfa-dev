@@ -351,9 +351,12 @@ static int k3_validate_power_state(unsigned int power_state,
 			req_state->pwr_domain_state[i] = PLAT_MAX_OFF_STATE;
 
 		/* 3. Handle Platform Specific Magic Numbers (LPM Hints) */
-		if (power_state == 0x2012234 || power_state == 0x2012235) {
+		// TODO!! Write a proper logic to parse these params
+		// and then decode the mode to choose
+		// Currently is garbage logic, best to ignore this for now.
+		if ( (power_state & 0x2012234) || (power_state & 0x2012235) ) {
 			INFO("%s: (core %d): s2idle: power_state: 0x%x\n", __func__, core, power_state);
-			am62l_lpm_state = power_state == 0x2012234 ? 0 : 6;
+			am62l_lpm_state = power_state &= 0x012234 ? 0 : 6;
 		}
 	}
 
@@ -370,6 +373,7 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int core, proc_id;
 	uint64_t  context_save_addr = 0x80A00000;
+	uint32_t mode = 6;
 	// timeout_local = 0xFFFFFFFF;
 	INFO("dbg: %s\n", __func__);
 	whileone = 0xFEED1;
@@ -386,11 +390,6 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 		 * Also drop the power up reference that was increased as part
 		 * of scmi_handler_device_state_set_on earlier
 		 */
-		// device_id_drop_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0);
-		// set_main_psc_state(PD_MPU_CLST_CORE_0 + 1, LPSC_MAIN_MPU_CLST_CORE_0 + 1,
-		// 		   PSC_PD_OFF, PSC_SYNCRESETDISABLE);
-		// while(whileone)
-		// 	wfi();
 		return;
 	}
 
@@ -402,7 +401,10 @@ static void am62l_pwr_domain_suspend(const psci_power_state_t *target_state)
 	/*
 	 * mode=6 for RTC only + DDR and mode=0 for deepsleep
 	 */
-	uint32_t mode = 6;
+	if (am62l_lpm_state != 0xDEAD) {
+		INFO ("STATE = %d", am62l_lpm_state);
+		mode = 0;
+	}
 
 	/* Prevent interrupts from spuriously waking up this cpu */
 	k3_gic_cpuif_disable();
@@ -442,15 +444,7 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 
 	if (core == 1) {
 		INFO("!!DHG GIC stuff \n");
-		/* 60 irqn = RTC */
-		// k3_gic_pcpu_init();
-		// k3_gic_cpuif_enable();
 		k3_gic_pcpu_restore();
-
-		// gicv3_set_spi_routing(60, GICV3_IRM_ANY, 1);
-		// gicv3_enable_interrupt(60, 1);
-		// gicv3_set_interrupt_pending(60, 1);
-		// plat_ic_raise_ns_sgi(60, 1);
 
 		return;
 	}
@@ -466,11 +460,6 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 	gicv3_enable_interrupt(60, 0);
 	gicv3_set_interrupt_pending(60, 0);
 	plat_ic_raise_ns_sgi(60, 0);
-	gicv3_set_spi_routing(60, GICV3_IRM_ANY, 1);
-	gicv3_enable_interrupt(60, 1);
-	gicv3_set_interrupt_pending(60, 1);
-	plat_ic_raise_ns_sgi(60, 1);
-
 
 	am62l_loc_pwr_on(1);
 }
