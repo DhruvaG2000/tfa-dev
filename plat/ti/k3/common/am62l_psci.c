@@ -441,10 +441,12 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 	}
 
 	if (core == 1) {
-		INFO("!!DHG GIC stuff\n");
+		INFO("!!DHG GIC stuff \n");
 		/* 60 irqn = RTC */
-		k3_gic_pcpu_init();
-		k3_gic_cpuif_enable();
+		// k3_gic_pcpu_init();
+		// k3_gic_cpuif_enable();
+		k3_gic_pcpu_restore();
+
 		// gicv3_set_spi_routing(60, GICV3_IRM_ANY, 1);
 		// gicv3_enable_interrupt(60, 1);
 		// gicv3_set_interrupt_pending(60, 1);
