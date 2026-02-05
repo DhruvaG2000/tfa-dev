@@ -14,4 +14,5 @@ BL31_SOURCES += drivers/ti/clk/ti_clk_mux.c \
 		drivers/ti/clk/ti_clk_pllctrl.c \
 		drivers/ti/clk/ti_pll.c \
 		drivers/ti/clk/ti_clk_pll_16fft.c \
-		drivers/ti/clk/ti_clk.c
+		drivers/ti/clk/ti_clk.c \
+		drivers/ti/clk/ti_clk_dev.c
