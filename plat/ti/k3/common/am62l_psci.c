@@ -356,14 +356,55 @@ static void am62l_pwr_domain_suspend_finish(const psci_power_state_t *target_sta
 			k3_lpm_set_io_isolation(false);
 			/* Initialize the console to provide early debug support */
 			k3_console_setup();
-			udelay(1000);
 			/* Initialize the console to provide early debug support */
 			INFO("!!resume Sequence in ATF core(%d)\n", core);
 		}
 
 		if (core == 1) {
-			INFO("!!GIC restore \n");
+			/*
+			 * Secondary core (core 1) resume synchronization:
+			 *
+			 * Problem: During s2idle resume, if core 1 returns to the kernel
+			 * before core 0 has fully completed its resume sequence, the kernel
+			 * may incorrectly put core 1 back to sleep, causing a deadlock.
+			 *
+			 * Solution: Core 1 waits here in EL3 until it detects an IPI from
+			 * the kernel (sent by core 0 after its resume is complete). We poll
+			 * the GIC Redistributor's ISPENDR0 register directly instead of
+			 * using the CPU interface (HPPIR) because:
+			 *
+			 * 1. The kernel's IPI (SGI 1) is configured as Group 0 (Secure),
+			 *    but the GIC CPU interface priority/group configuration after
+			 *    restore doesn't reliably signal it via HPPIR.
+			 *
+			 * 2. Reading ISPENDR0 directly from the redistributor bypasses
+			 *    the CPU interface and reliably shows pending SGIs regardless
+			 *    of group/priority configuration.
+			 *
+			 * 3. SGIs are bits 0-15 in ISPENDR0, so we mask with 0xFFFF.
+			 */
+			int core1_timeout = 10000; /* 10000 * 100us = 1 second */
+			extern uintptr_t rdistif_base_addrs[];
+			uintptr_t gicr_base = rdistif_base_addrs[core];
+			uint32_t ispendr0;
+			ispendr0 = mmio_read_32(gicr_base + GICR_ISPENDR0);
+			ERROR("DBG:ispendinitially=0x%x", ispendr0);
+
+			/* Restore per-CPU GIC redistributor context and enable CPU interface */
 			k3_gic_pcpu_restore();
+
+			/* Poll GICR_ISPENDR0 directly for any pending SGI (bits 0-15) */
+			do {
+				ispendr0 = mmio_read_32(gicr_base + GICR_ISPENDR0);
+				if (ispendr0 & 0xFFFFU) {
+					break;
+				}
+				udelay(100);
+				core1_timeout--;
+			} while (core1_timeout > 0);
+
+			if (core1_timeout == 0)
+				ERROR("Core 1: TIMEOUT waiting for IPI from kernel!\n");
 
 			return;
 		}
