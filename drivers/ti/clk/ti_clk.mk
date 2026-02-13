@@ -6,7 +6,8 @@
 
 INCLUDES += -Idrivers/ti/common/include \
 	    -Idrivers/ti/common/pm/include \
-	    -Idrivers/ti/clk/include
+	    -Idrivers/ti/clk/include \
+	    -Iinclude/drivers
 
 BL31_SOURCES += drivers/ti/clk/ti_clk_mux.c \
 		drivers/ti/clk/ti_clk_div.c \
@@ -17,4 +18,5 @@ BL31_SOURCES += drivers/ti/clk/ti_clk_mux.c \
 		drivers/ti/clk/ti_clk.c \
 		drivers/ti/clk/ti_clk_dev.c \
 		drivers/ti/clk/ti_clk_soc_hfosc0.c \
-		drivers/ti/clk/ti_clk_soc_lfosc0.c
+		drivers/ti/clk/ti_clk_soc_lfosc0.c \
+		drivers/ti/clk/ti_clk_handler.c
