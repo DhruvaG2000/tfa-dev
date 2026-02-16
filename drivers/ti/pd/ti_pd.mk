@@ -13,4 +13,5 @@ BL31_SOURCES += drivers/ti/pd/ti_device_clk.c \
 		drivers/ti/pd/ti_device.c \
 		drivers/ti/pd/ti_device_prepare.c \
 		drivers/ti/pd/ti_psc.c \
-		drivers/ti/pd/ti_device_psc.c
+		drivers/ti/pd/ti_device_psc.c \
+		drivers/ti/pd/ti_device_handler.c
