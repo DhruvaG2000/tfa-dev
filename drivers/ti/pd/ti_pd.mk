@@ -9,4 +9,5 @@ PLAT_INCLUDES += -Idrivers/ti/pd/include/ \
 		 -Idrivers/ti/common/pm/include
 
 BL31_SOURCES += drivers/ti/pd/ti_device_clk.c \
-		drivers/ti/pd/ti_resource.c
+		drivers/ti/pd/ti_resource.c \
+		drivers/ti/pd/ti_device_pm.c
