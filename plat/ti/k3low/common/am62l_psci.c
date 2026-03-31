@@ -15,6 +15,7 @@
 #include <lib/psci/psci.h>
 #include <plat/common/platform.h>
 #include <ti_device_handler.h>
+#include <ti_device_pm.h>
 #include <ti_sci.h>
 #include <ti_sci_protocol.h>
 
@@ -197,6 +198,7 @@ static int am62l_pwr_domain_on(u_register_t mpidr)
 
 	set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
 			   PSC_PD_ON, PSC_ENABLE);
+	ti_device_id_power_up_ref(AM62LX_DEV_A53_0 + core);
 
 	return PSCI_E_SUCCESS;
 }
@@ -221,6 +223,7 @@ static void am62l_pwr_down_domain(const psci_power_state_t *target_state)
 		VERBOSE("%s: A53 CORE: %d OFF\n", __func__, core);
 		set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
 				   PSC_PD_OFF, PSC_SYNCRESETDISABLE);
+		ti_device_id_drop_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0);
 	}
 }
 
