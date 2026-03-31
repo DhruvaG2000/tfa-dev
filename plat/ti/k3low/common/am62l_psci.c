@@ -14,6 +14,8 @@
 #include <lib/mmio.h>
 #include <lib/psci/psci.h>
 #include <plat/common/platform.h>
+#include <ti_device_handler.h>
+#include <ti_device_pm.h>
 #include <ti_sci.h>
 #include <ti_sci_protocol.h>
 
@@ -60,10 +62,10 @@ static int am62l_pwr_domain_on(u_register_t mpidr)
 		return PSCI_E_INTERN_FAIL;
 	}
 
-	/*
-	 * TODO: Add the actual PM operation call
-	 * to turn on the core here
-	 */
+	set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
+			   PSC_PD_ON, PSC_ENABLE);
+	ti_device_id_power_up_ref(AM62LX_DEV_A53_0 + core);
+
 	return PSCI_E_SUCCESS;
 }
 
@@ -79,7 +81,17 @@ static void am62l_pwr_domain_off(const psci_power_state_t *target_state)
 
 static void am62l_pwr_down_domain(const psci_power_state_t *target_state)
 {
-	/* TODO: Add the actual pm operation call to turn off the core */
+	int core;
+
+	core = plat_my_core_pos();
+
+	/* If our cluster is not going down we stop here */
+	if (CLUSTER_PWR_STATE(target_state) != PLAT_MAX_OFF_STATE) {
+		VERBOSE("%s: A53 CORE: %d OFF\n", __func__, core);
+		set_main_psc_state(PD_MPU_CLST_CORE_0 + core, LPSC_MAIN_MPU_CLST_CORE_0 + core,
+				   PSC_PD_OFF, PSC_SYNCRESETDISABLE);
+		ti_device_id_drop_power_up_ref(AM62LX_DEV_COMPUTE_CLUSTER0);
+	}
 }
 
 void am62l_pwr_domain_on_finish(const psci_power_state_t *target_state)
